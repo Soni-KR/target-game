@@ -14,6 +14,9 @@ function ReactionGame() {
   const [reactionTimes, setReactionTimes] = useState([]);
 
   const targetSpawnTime = useRef(null);
+  const boardRef = useRef(null);
+
+const [feedback, setFeedback] = useState(null);
 const [highScore, setHighScore] = useState(() => {
   const savedScore = localStorage.getItem("reactionHighScore");
   return savedScore ? Number(savedScore) : 0;
@@ -39,26 +42,33 @@ const difficulty =
     : score >= 8
     ? "Medium"
     : "Easy";
-  function moveTarget() {
-    const boardWidth = 900;
-    const boardHeight = 450;
+function moveTarget() {
+  if (!boardRef.current) return;
 
-    const maxX = boardWidth - targetSize;
-    const maxY = boardHeight - targetSize;
+  const boardWidth = boardRef.current.clientWidth;
+  const boardHeight = boardRef.current.clientHeight;
 
-    const randomX = Math.random() * maxX;
-    const randomY = Math.random() * maxY;
+  const maxX = boardWidth - targetSize;
+  const maxY = boardHeight - targetSize;
 
-    setTargetPosition({
-      x: randomX,
-      y: randomY,
-    });
+  const randomX = Math.random() * maxX;
+  const randomY = Math.random() * maxY;
 
-    targetSpawnTime.current = performance.now();
-  }
+  setTargetPosition({
+    x: randomX,
+    y: randomY,
+  });
+
+  targetSpawnTime.current = performance.now();
+}
 
   function handleTargetClick(event) {
     event.stopPropagation();
+    setFeedback("hit");
+
+setTimeout(() => {
+  setFeedback(null);
+}, 150);
 
     const currentReactionTime =
       performance.now() - targetSpawnTime.current;
@@ -85,12 +95,18 @@ const difficulty =
     moveTarget();
   }
 
-  function handleBoardClick() {
-    if (!isPlaying) return;
+function handleBoardClick() {
+  if (!isPlaying) return;
 
-    setMisses((previousMisses) => previousMisses + 1);
-    setCombo(0);
-  }
+  setMisses((previousMisses) => previousMisses + 1);
+  setCombo(0);
+
+  setFeedback("miss");
+
+  setTimeout(() => {
+    setFeedback(null);
+  }, 150);
+}
 
   function startGame() {
     setScore(0);
@@ -136,12 +152,18 @@ useEffect(() => {
   useEffect(() => {
     if (!isPlaying) return;
 
-    const targetTimer = setTimeout(() => {
-      setMisses((previousMisses) => previousMisses + 1);
-      setCombo(0);
+const targetTimer = setTimeout(() => {
+  setMisses((previousMisses) => previousMisses + 1);
+  setCombo(0);
 
-      moveTarget();
-    }, targetLifetime);
+  setFeedback("miss");
+
+  setTimeout(() => {
+    setFeedback(null);
+  }, 150);
+
+  moveTarget();
+}, targetLifetime);
 
     return () => clearTimeout(targetTimer);
   }, [targetPosition, isPlaying, targetLifetime]);
@@ -202,9 +224,10 @@ useEffect(() => {
   Difficulty: {difficulty}
 </p>
       <section
-        className="game-board"
-        onClick={handleBoardClick}
-      >
+  ref={boardRef}
+  className={`game-board ${feedback ? feedback : ""}`}
+  onClick={handleBoardClick}
+>
         {isPlaying ? (
           <button
             className="target"
