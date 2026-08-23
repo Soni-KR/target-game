@@ -99,7 +99,7 @@ transition:
 }
 .game-over {
   text-align: center;
-  <p>High Score: {highScore}</p>
+  
 }
 
 .game-over h2 {
@@ -112,4 +112,9 @@ transition:
 }
 .game-board {
   cursor: crosshair;
+}
+.difficulty {
+  text-align: center;
+  margin-top: 15px;
+  font-weight: bold;
 }

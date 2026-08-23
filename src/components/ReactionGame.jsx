@@ -175,10 +175,14 @@ useEffect(() => {
 
       <section className="stats">
 <div className="stat">
+  <span className="stat-label">Score</span>
+  <span className="stat-value">{score}</span>
+</div>
+
+<div className="stat">
   <span className="stat-label">High Score</span>
   <span className="stat-value">{highScore}</span>
 </div>
-
         <div className="stat">
           <span className="stat-label">Time</span>
           <span className="stat-value">{timeLeft}s</span>
@@ -194,7 +198,9 @@ useEffect(() => {
           <span className="stat-value">{misses}</span>
         </div>
       </section>
-
+        <p className="difficulty">
+  Difficulty: {difficulty}
+</p>
       <section
         className="game-board"
         onClick={handleBoardClick}
