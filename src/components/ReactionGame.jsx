@@ -1,314 +1,222 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import "../styles/reaction-game.css";
 
-function ReactionGame() {
-  const [isPlaying, setIsPlaying] = useState(false);
+const GAME_LENGTH = 30;
 
+function SonicIcon() {
+  return (
+    <svg className="sonic-icon" viewBox="0 0 100 100" aria-hidden="true">
+      <path className="sonic-spikes" d="M44 15 15 7l14 23L7 31l22 17-20 9 29 8Z" />
+      <path className="sonic-head" d="M69 26c-20-7-39 6-42 25-4 21 11 39 33 39 21 0 34-16 33-36-1-14-10-24-24-28Z" />
+      <path className="sonic-muzzle" d="M53 57c4-9 14-15 25-12 9 2 15 10 14 19-1 13-15 23-29 18-11-4-15-15-10-25Z" />
+      <path className="sonic-eye" d="M57 34c8-2 13 5 11 16-2 10-9 16-15 12-6-4-4-25 4-28Z" />
+      <path className="sonic-eye" d="M72 35c7-1 12 6 10 15-1 8-7 13-12 10-5-4-4-23 2-25Z" />
+      <circle className="sonic-pupil" cx="61" cy="52" r="3" />
+      <circle className="sonic-pupil" cx="75" cy="51" r="3" />
+      <ellipse className="sonic-nose" cx="92" cy="57" rx="7" ry="5" />
+      <path className="sonic-smile" d="M69 70c7 4 14 2 18-3" />
+    </svg>
+  );
+}
+
+function ReactionGame() {
+  const [phase, setPhase] = useState("idle");
+  const [countdown, setCountdown] = useState(null);
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(GAME_LENGTH);
   const [misses, setMisses] = useState(0);
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
-
   const [reactionTime, setReactionTime] = useState(null);
   const [reactionTimes, setReactionTimes] = useState([]);
+  const [feedback, setFeedback] = useState(null);
+  const [soundOn, setSoundOn] = useState(true);
+  const [highScore, setHighScore] = useState(() => {
+    const saved = localStorage.getItem("aimRushHighScore") ?? localStorage.getItem("reactionHighScore");
+    return saved ? Number(saved) : 0;
+  });
+  const [targetPosition, setTargetPosition] = useState({ x: 100, y: 100 });
 
   const targetSpawnTime = useRef(null);
   const boardRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const feedbackTimerRef = useRef(null);
+  const isPlaying = phase === "playing";
+  const targetSize = score >= 15 ? 48 : score >= 8 ? 58 : 72;
+  const targetLifetime = score >= 15 ? 600 : score >= 8 ? 850 : 1200;
+  const difficulty = score >= 15 ? "Hard" : score >= 8 ? "Medium" : "Easy";
 
-const [feedback, setFeedback] = useState(null);
-const [highScore, setHighScore] = useState(() => {
-  const savedScore = localStorage.getItem("reactionHighScore");
-  return savedScore ? Number(savedScore) : 0;
-});
-  const [targetPosition, setTargetPosition] = useState({
-    x: 100,
-    y: 100,
-  });
+  const playTone = useCallback((frequency, duration = 0.08, type = "sine", volume = 0.05) => {
+    if (!soundOn) return;
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const context = audioContextRef.current ?? new AudioContext();
+    audioContextRef.current = context;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, context.currentTime);
+    gain.gain.setValueAtTime(volume, context.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + duration);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + duration);
+  }, [soundOn]);
 
-  // Difficulty depends on score
-  const targetSize =
-    score >= 15 ? 45 :
-    score >= 8 ? 55 :
-    70;
+  const showFeedback = useCallback((kind) => {
+    window.clearTimeout(feedbackTimerRef.current);
+    setFeedback(kind);
+    feedbackTimerRef.current = window.setTimeout(() => setFeedback(null), 180);
+  }, []);
 
-  const targetLifetime =
-    score >= 15 ? 600 :
-    score >= 8 ? 850 :
-    1200;
-const difficulty =
-  score >= 15
-    ? "Hard"
-    : score >= 8
-    ? "Medium"
-    : "Easy";
-function moveTarget() {
-  if (!boardRef.current) return;
+  const moveTarget = useCallback(() => {
+    if (!boardRef.current) return;
+    const maxX = Math.max(0, boardRef.current.clientWidth - targetSize);
+    const maxY = Math.max(0, boardRef.current.clientHeight - targetSize);
+    setTargetPosition({ x: Math.random() * maxX, y: Math.random() * maxY });
+    targetSpawnTime.current = performance.now();
+  }, [targetSize]);
 
-  const boardWidth = boardRef.current.clientWidth;
-  const boardHeight = boardRef.current.clientHeight;
-
-  const maxX = boardWidth - targetSize;
-  const maxY = boardHeight - targetSize;
-
-  const randomX = Math.random() * maxX;
-  const randomY = Math.random() * maxY;
-
-  setTargetPosition({
-    x: randomX,
-    y: randomY,
-  });
-
-  targetSpawnTime.current = performance.now();
-}
+  const registerMiss = useCallback(() => {
+    setMisses((value) => value + 1);
+    setCombo(0);
+    showFeedback("miss");
+    playTone(135, 0.1, "sawtooth", 0.035);
+  }, [playTone, showFeedback]);
 
   function handleTargetClick(event) {
     event.stopPropagation();
-    setFeedback("hit");
-
-setTimeout(() => {
-  setFeedback(null);
-}, 150);
-
-    const currentReactionTime =
-      performance.now() - targetSpawnTime.current;
-
+    const currentReactionTime = performance.now() - targetSpawnTime.current;
+    playTone(720 + Math.min(combo, 8) * 35, 0.07, "sine", 0.055);
+    showFeedback("hit");
     setReactionTime(currentReactionTime);
-
-    setReactionTimes((previousTimes) => [
-      ...previousTimes,
-      currentReactionTime,
-    ]);
-
-    setScore((previousScore) => previousScore + 1);
-
-    setCombo((previousCombo) => {
-      const newCombo = previousCombo + 1;
-
-      setMaxCombo((previousMax) =>
-        Math.max(previousMax, newCombo)
-      );
-
-      return newCombo;
+    setReactionTimes((times) => [...times, currentReactionTime]);
+    setScore((value) => {
+      const next = value + 1;
+      setHighScore((currentBest) => {
+        if (next <= currentBest) return currentBest;
+        localStorage.setItem("aimRushHighScore", next);
+        return next;
+      });
+      return next;
     });
-
+    setCombo((value) => {
+      const next = value + 1;
+      setMaxCombo((currentMax) => Math.max(currentMax, next));
+      return next;
+    });
     moveTarget();
   }
-
-function handleBoardClick() {
-  if (!isPlaying) return;
-
-  setMisses((previousMisses) => previousMisses + 1);
-  setCombo(0);
-
-  setFeedback("miss");
-
-  setTimeout(() => {
-    setFeedback(null);
-  }, 150);
-}
 
   function startGame() {
     setScore(0);
     setMisses(0);
     setCombo(0);
     setMaxCombo(0);
-    setTimeLeft(30);
-
+    setTimeLeft(GAME_LENGTH);
     setReactionTime(null);
     setReactionTimes([]);
+    setFeedback(null);
+    setCountdown(3);
+    setPhase("countdown");
+    playTone(440, 0.1, "square", 0.035);
+  }
 
-    setIsPlaying(true);
-  }
-useEffect(() => {
-  if (score > highScore) {
-    setHighScore(score);
-    localStorage.setItem("reactionHighScore", score);
-  }
-}, [score, highScore]);
   useEffect(() => {
-    if (!isPlaying) return;
+    if (phase !== "countdown") return undefined;
+    const timer = window.setTimeout(() => {
+      if (countdown > 1) {
+        setCountdown((value) => value - 1);
+        playTone(440, 0.1, "square", 0.035);
+      } else if (countdown === 1) {
+        setCountdown("GO!");
+        playTone(880, 0.18, "square", 0.045);
+      } else {
+        setCountdown(null);
+        setPhase("playing");
+      }
+    }, countdown === "GO!" ? 650 : 800);
+    return () => window.clearTimeout(timer);
+  }, [countdown, phase, playTone]);
 
+  useEffect(() => {
+    if (!isPlaying) return undefined;
     moveTarget();
-  }, [isPlaying]);
-
-  useEffect(() => {
-    if (!isPlaying) return;
-
-    const gameTimer = setInterval(() => {
-      setTimeLeft((previousTime) => {
-        if (previousTime <= 1) {
-          setIsPlaying(false);
+    const gameTimer = window.setInterval(() => {
+      setTimeLeft((time) => {
+        if (time <= 1) {
+          setPhase("finished");
+          playTone(220, 0.35, "triangle", 0.05);
           return 0;
         }
-
-        return previousTime - 1;
+        return time - 1;
       });
     }, 1000);
-
-    return () => clearInterval(gameTimer);
-  }, [isPlaying]);
+    return () => window.clearInterval(gameTimer);
+  }, [isPlaying, moveTarget, playTone]);
 
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying) return undefined;
+    const targetTimer = window.setTimeout(() => {
+      registerMiss();
+      moveTarget();
+    }, targetLifetime);
+    return () => window.clearTimeout(targetTimer);
+  }, [targetPosition, isPlaying, targetLifetime, moveTarget, registerMiss]);
 
-const targetTimer = setTimeout(() => {
-  setMisses((previousMisses) => previousMisses + 1);
-  setCombo(0);
+  useEffect(() => () => window.clearTimeout(feedbackTimerRef.current), []);
 
-  setFeedback("miss");
-
-  setTimeout(() => {
-    setFeedback(null);
-  }, 150);
-
-  moveTarget();
-}, targetLifetime);
-
-    return () => clearTimeout(targetTimer);
-  }, [targetPosition, isPlaying, targetLifetime]);
-
-  const bestReaction =
-    reactionTimes.length > 0
-      ? Math.min(...reactionTimes)
-      : null;
-
-  const averageReaction =
-    reactionTimes.length > 0
-      ? reactionTimes.reduce(
-          (total, time) => total + time,
-          0
-        ) / reactionTimes.length
-      : null;
-
-  const totalAttempts = score + misses;
-
-  const accuracy =
-    totalAttempts > 0
-      ? (score / totalAttempts) * 100
-      : 0;
+  const bestReaction = reactionTimes.length ? Math.min(...reactionTimes) : null;
+  const averageReaction = reactionTimes.length ? reactionTimes.reduce((total, time) => total + time, 0) / reactionTimes.length : null;
+  const accuracy = score + misses ? (score / (score + misses)) * 100 : 0;
 
   return (
     <main className="game">
       <header className="game-header">
-        <h1>Reaction Target</h1>
-        <p>Test your speed and accuracy.</p>
+        <div className="eyebrow">PRECISION TRAINER</div>
+        <h1>Aim Rush</h1>
+        <p>Practice your aim. Build your streak. Beat your best.</p>
       </header>
-
-      <section className="stats">
-<div className="stat">
-  <span className="stat-label">Score</span>
-  <span className="stat-value">{score}</span>
-</div>
-
-<div className="stat">
-  <span className="stat-label">High Score</span>
-  <span className="stat-value">{highScore}</span>
-</div>
-        <div className="stat">
-          <span className="stat-label">Time</span>
-          <span className="stat-value">{timeLeft}s</span>
-        </div>
-
-        <div className="stat">
-          <span className="stat-label">Combo</span>
-          <span className="stat-value">x{combo}</span>
-        </div>
-
-        <div className="stat">
-          <span className="stat-label">Misses</span>
-          <span className="stat-value">{misses}</span>
-        </div>
+      <section className="stats" aria-label="Game statistics">
+        <div className="stat"><span className="stat-label">Score</span><span className="stat-value">{score}</span></div>
+        <div className="stat"><span className="stat-label">Best</span><span className="stat-value">{highScore}</span></div>
+        <div className="stat"><span className="stat-label">Time</span><span className={`stat-value ${timeLeft <= 5 && isPlaying ? "danger" : ""}`}>{timeLeft}s</span></div>
+        <div className="stat"><span className="stat-label">Combo</span><span className="stat-value">×{combo}</span></div>
+        <div className="stat"><span className="stat-label">Misses</span><span className="stat-value">{misses}</span></div>
       </section>
-        <p className="difficulty">
-  Difficulty: {difficulty}
-</p>
-      <section
-  ref={boardRef}
-  className={`game-board ${feedback ? feedback : ""}`}
-  onClick={handleBoardClick}
->
+      <div className="game-meta">
+        <span className={`difficulty difficulty-${difficulty.toLowerCase()}`}>{difficulty}</span>
+        <button className="sound-toggle" onClick={() => setSoundOn((value) => !value)} aria-label={`${soundOn ? "Mute" : "Enable"} sound`}>{soundOn ? "Sound on" : "Sound off"}</button>
+      </div>
+      <section ref={boardRef} className={`game-board ${feedback ?? ""}`} onClick={() => isPlaying && registerMiss()}>
+        <div className="board-glow" />
         {isPlaying ? (
-          <button
-            className="target"
-            style={{
-              left: `${targetPosition.x}px`,
-              top: `${targetPosition.y}px`,
-              width: `${targetSize}px`,
-              height: `${targetSize}px`,
-            }}
-            onClick={handleTargetClick}
-          >
-            🎯
+          <button className="target" style={{ left: targetPosition.x, top: targetPosition.y, width: targetSize, height: targetSize }} onClick={handleTargetClick} aria-label="Hit Sonic target">
+            <span className="target-ring" /><SonicIcon />
           </button>
-        ) : timeLeft === 0 ? (
+        ) : phase === "countdown" ? (
+          <div key={countdown} className={`countdown ${countdown === "GO!" ? "go" : ""}`}>{countdown}</div>
+        ) : phase === "finished" ? (
           <div className="game-over">
-            <p>High Score: {highScore}</p>
-            <h2>Game Over</h2>
-
-            <p>Score: {score}</p>
-            <p>Misses: {misses}</p>
-            <p>Accuracy: {accuracy.toFixed(1)}%</p>
-            <p>Best Combo: x{maxCombo}</p>
-
-            <p>
-              Best Reaction:{" "}
-              {bestReaction
-                ? `${Math.round(bestReaction)} ms`
-                : "--"}
-            </p>
-
-            <p>
-              Average Reaction:{" "}
-              {averageReaction
-                ? `${Math.round(averageReaction)} ms`
-                : "--"}
-            </p>
+            <span className="results-kicker">RUN COMPLETE</span>
+            <h2>{score > 0 && score >= highScore ? "New best!" : "Nice run!"}</h2>
+            <div className="result-score">{score}<small> hits</small></div>
+            <div className="results-grid">
+              <span><strong>{accuracy.toFixed(1)}%</strong>Accuracy</span><span><strong>×{maxCombo}</strong>Best combo</span>
+              <span><strong>{bestReaction ? `${Math.round(bestReaction)} ms` : "—"}</strong>Best reaction</span><span><strong>{averageReaction ? `${Math.round(averageReaction)} ms` : "—"}</strong>Average</span>
+            </div>
           </div>
         ) : (
-          <p className="game-message">
-            Press Start to begin
-          </p>
+          <div className="game-message"><SonicIcon /><strong>Ready to move fast?</strong><span>Hit every Sonic target before it disappears.</span></div>
         )}
       </section>
-
       {isPlaying && (
         <section className="reaction-stats">
-          <span>
-            Reaction:{" "}
-            {reactionTime
-              ? `${Math.round(reactionTime)} ms`
-              : "--"}
-          </span>
-
-          <span>
-            Best:{" "}
-            {bestReaction
-              ? `${Math.round(bestReaction)} ms`
-              : "--"}
-          </span>
-
-          <span>
-            Average:{" "}
-            {averageReaction
-              ? `${Math.round(averageReaction)} ms`
-              : "--"}
-          </span>
-
-          <span>
-            Accuracy: {accuracy.toFixed(1)}%
-          </span>
+          <span>Reaction <strong>{reactionTime ? `${Math.round(reactionTime)} ms` : "—"}</strong></span><span>Best <strong>{bestReaction ? `${Math.round(bestReaction)} ms` : "—"}</strong></span>
+          <span>Average <strong>{averageReaction ? `${Math.round(averageReaction)} ms` : "—"}</strong></span><span>Accuracy <strong>{accuracy.toFixed(1)}%</strong></span>
         </section>
       )}
-
-      {!isPlaying && (
-        <button
-          className="start-button"
-          onClick={startGame}
-        >
-          {timeLeft === 0 ? "Play Again" : "Start Game"}
-        </button>
-      )}
+      {(phase === "idle" || phase === "finished") && <button className="start-button" onClick={startGame}>{phase === "finished" ? "Run It Again" : "Start Training"}<span aria-hidden="true">→</span></button>}
     </main>
   );
 }
