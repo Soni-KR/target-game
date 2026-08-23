@@ -66,3 +66,24 @@
 
   cursor: pointer;
 }
+.target {
+  position: absolute;
+
+  width: 70px;
+  height: 70px;
+
+  border: none;
+  border-radius: 50%;
+
+  font-size: 2rem;
+
+  cursor: pointer;
+}
+.reaction-stats {
+  display: flex;
+  justify-content: space-between;
+
+  margin-top: 20px;
+
+  font-size: 0.95rem;
+}
