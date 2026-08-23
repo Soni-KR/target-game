@@ -36,18 +36,20 @@ function ReactionGame() {
     return saved ? Number(saved) : 0;
   });
   const [targetPosition, setTargetPosition] = useState({ x: 100, y: 100 });
+  const [runStartingHighScore, setRunStartingHighScore] = useState(highScore);
 
   const targetSpawnTime = useRef(null);
   const boardRef = useRef(null);
   const audioContextRef = useRef(null);
   const feedbackTimerRef = useRef(null);
+  const soundOnRef = useRef(true);
   const isPlaying = phase === "playing";
   const targetSize = score >= 15 ? 48 : score >= 8 ? 58 : 72;
   const targetLifetime = score >= 15 ? 600 : score >= 8 ? 850 : 1200;
   const difficulty = score >= 15 ? "Hard" : score >= 8 ? "Medium" : "Easy";
 
   const playTone = useCallback((frequency, duration = 0.08, type = "sine", volume = 0.05) => {
-    if (!soundOn) return;
+    if (!soundOnRef.current) return;
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
     const context = audioContextRef.current ?? new AudioContext();
@@ -61,7 +63,7 @@ function ReactionGame() {
     oscillator.connect(gain).connect(context.destination);
     oscillator.start();
     oscillator.stop(context.currentTime + duration);
-  }, [soundOn]);
+  }, []);
 
   const showFeedback = useCallback((kind) => {
     window.clearTimeout(feedbackTimerRef.current);
@@ -109,6 +111,7 @@ function ReactionGame() {
   }
 
   function startGame() {
+    setRunStartingHighScore(highScore);
     setScore(0);
     setMisses(0);
     setCombo(0);
@@ -120,6 +123,13 @@ function ReactionGame() {
     setCountdown(3);
     setPhase("countdown");
     playTone(440, 0.1, "square", 0.035);
+  }
+
+  function toggleSound() {
+    setSoundOn((value) => {
+      soundOnRef.current = !value;
+      return !value;
+    });
   }
 
   useEffect(() => {
@@ -142,18 +152,23 @@ function ReactionGame() {
   useEffect(() => {
     if (!isPlaying) return undefined;
     moveTarget();
-    const gameTimer = window.setInterval(() => {
-      setTimeLeft((time) => {
-        if (time <= 1) {
-          setPhase("finished");
-          playTone(220, 0.35, "triangle", 0.05);
-          return 0;
-        }
-        return time - 1;
-      });
-    }, 1000);
+  }, [isPlaying, moveTarget]);
+
+  useEffect(() => {
+    if (!isPlaying) return undefined;
+    const endTime = performance.now() + GAME_LENGTH * 1000;
+    const updateClock = () => {
+      const remaining = Math.max(0, Math.ceil((endTime - performance.now()) / 1000));
+      setTimeLeft(remaining);
+      if (remaining === 0) {
+        window.clearInterval(gameTimer);
+        setPhase("finished");
+        playTone(220, 0.35, "triangle", 0.05);
+      }
+    };
+    const gameTimer = window.setInterval(updateClock, 100);
     return () => window.clearInterval(gameTimer);
-  }, [isPlaying, moveTarget, playTone]);
+  }, [isPlaying, playTone]);
 
   useEffect(() => {
     if (!isPlaying) return undefined;
@@ -186,7 +201,7 @@ function ReactionGame() {
       </section>
       <div className="game-meta">
         <span className={`difficulty difficulty-${difficulty.toLowerCase()}`}>{difficulty}</span>
-        <button className="sound-toggle" onClick={() => setSoundOn((value) => !value)} aria-label={`${soundOn ? "Mute" : "Enable"} sound`}>{soundOn ? "Sound on" : "Sound off"}</button>
+        <button className="sound-toggle" onClick={toggleSound} aria-label={`${soundOn ? "Mute" : "Enable"} sound`}>{soundOn ? "Sound on" : "Sound off"}</button>
       </div>
       <section ref={boardRef} className={`game-board ${feedback ?? ""}`} onClick={() => isPlaying && registerMiss()}>
         <div className="board-glow" />
@@ -199,7 +214,7 @@ function ReactionGame() {
         ) : phase === "finished" ? (
           <div className="game-over">
             <span className="results-kicker">RUN COMPLETE</span>
-            <h2>{score > 0 && score >= highScore ? "New best!" : "Nice run!"}</h2>
+            <h2>{score > runStartingHighScore ? "New best!" : "Nice run!"}</h2>
             <div className="result-score">{score}<small> hits</small></div>
             <div className="results-grid">
               <span><strong>{accuracy.toFixed(1)}%</strong>Accuracy</span><span><strong>×{maxCombo}</strong>Best combo</span>

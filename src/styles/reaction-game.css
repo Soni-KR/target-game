@@ -20,11 +20,11 @@
 .board-glow { position: absolute; left: 50%; top: 50%; width: 1px; height: 1px; box-shadow: 0 0 160px 70px rgba(14,165,233,.07); pointer-events: none; }
 .game-board.hit { border-color: #22c55e; box-shadow: 0 0 0 2px rgba(34,197,94,.14),0 0 35px rgba(34,197,94,.12); }
 .game-board.miss { border-color: #ef4444; box-shadow: 0 0 0 2px rgba(239,68,68,.14),0 0 35px rgba(239,68,68,.1); animation: boardShake .16s; }
-.target { position: absolute; display: grid; place-items: center; padding: 8%; border: 0; border-radius: 50%; background: radial-gradient(circle at 38% 32%,#38bdf8,#0267c9 55%,#02357a); cursor: crosshair; box-shadow: 0 0 0 3px rgba(125,211,252,.3),0 0 0 8px rgba(14,165,233,.08),0 7px 25px rgba(0,0,0,.55); animation: targetIn .13s cubic-bezier(.2,.9,.3,1.4); transition: transform .09s,filter .09s; z-index: 2; }
+.target { position: absolute; display: grid; place-items: center; padding: 0%; border: 0; border-radius: 50%; background: radial-gradient(circle at 38% 32%,#38bdf8,#0267c9 55%,#02357a); cursor: crosshair; box-shadow: 0 0 0 3px rgba(125,211,252,.3),0 0 0 8px rgba(14,165,233,.08),0 7px 25px rgba(0,0,0,.55); animation: targetIn .13s cubic-bezier(.2,.9,.3,1.4); transition: transform .09s,filter .09s; z-index: 2; }
 .target:hover { transform: scale(1.09); filter: brightness(1.15); }
 .target:active { transform: scale(.82); }
 .target-ring { position: absolute; inset: -8px; border: 1px solid rgba(125,211,252,.35); border-radius: 50%; animation: ringPulse 1s infinite; }
-.sonic-icon { width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 2px 2px rgba(0,0,0,.3)); }
+.sonic-icon { width: 78%; height: 78%; overflow: visible; filter: drop-shadow(0 2px 2px rgba(0,0,0,.3)); }
 .sonic-spikes,.sonic-head { fill: #075bca; stroke: #7dd3fc; stroke-width: 2; stroke-linejoin: round; }
 .sonic-muzzle { fill: #ffd49b; } .sonic-eye { fill: #fff; } .sonic-pupil,.sonic-nose { fill: #07111f; }
 .sonic-smile { fill: none; stroke: #582d26; stroke-width: 2; stroke-linecap: round; }

@@ -1,16 +1,42 @@
-# React + Vite
+# Aim Rush
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aim Rush is a fast browser-based aim and reaction trainer. Hit the moving Sonic-inspired target before it relocates, keep your combo alive, and beat your personal best during a 30-second run.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Animated `3 → 2 → 1 → GO!` start sequence
+- Adaptive target size and lifetime at score milestones
+- Hit, miss, countdown, and finish sound effects with a mute control
+- Score, combo, misses, accuracy, and reaction-time tracking
+- Persistent local high score
+- Responsive layout and reduced-motion support
 
-## React Compiler
+## Run locally
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Requirements: Node.js and npm.
 
-## Expanding the ESLint configuration
+```bash
+npm install
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Open the local URL printed by Vite.
+
+## Scripts
+
+```bash
+npm run dev      # Start the development server
+npm run build    # Create a production build
+npm run preview  # Preview the production build
+npm run lint     # Run ESLint
+```
+
+## Gameplay
+
+Select **Start Training**, wait for the countdown, and click each target as quickly as possible. Missing the target—or allowing it to expire—breaks the current combo. Difficulty increases automatically at scores 8 and 15.
+
+The game stores the high score in the browser's local storage; no account or backend is required.
+
+## Built with
+
+React 19 and Vite 8. Audio is synthesized with the Web Audio API, and the target artwork is rendered as inline SVG, so the game has no external media dependencies.
