@@ -8,20 +8,43 @@ function ReactionGame() {
   const [timeLeft, setTimeLeft] = useState(30);
   const [misses, setMisses] = useState(0);
   const [combo, setCombo] = useState(0);
+  const [maxCombo, setMaxCombo] = useState(0);
 
   const [reactionTime, setReactionTime] = useState(null);
   const [reactionTimes, setReactionTimes] = useState([]);
 
   const targetSpawnTime = useRef(null);
-
+const [highScore, setHighScore] = useState(() => {
+  const savedScore = localStorage.getItem("reactionHighScore");
+  return savedScore ? Number(savedScore) : 0;
+});
   const [targetPosition, setTargetPosition] = useState({
     x: 100,
     y: 100,
   });
 
+  // Difficulty depends on score
+  const targetSize =
+    score >= 15 ? 45 :
+    score >= 8 ? 55 :
+    70;
+
+  const targetLifetime =
+    score >= 15 ? 600 :
+    score >= 8 ? 850 :
+    1200;
+const difficulty =
+  score >= 15
+    ? "Hard"
+    : score >= 8
+    ? "Medium"
+    : "Easy";
   function moveTarget() {
-    const maxX = 830;
-    const maxY = 380;
+    const boardWidth = 900;
+    const boardHeight = 450;
+
+    const maxX = boardWidth - targetSize;
+    const maxY = boardHeight - targetSize;
 
     const randomX = Math.random() * maxX;
     const randomY = Math.random() * maxY;
@@ -48,15 +71,22 @@ function ReactionGame() {
     ]);
 
     setScore((previousScore) => previousScore + 1);
-    setCombo((previousCombo) => previousCombo + 1);
+
+    setCombo((previousCombo) => {
+      const newCombo = previousCombo + 1;
+
+      setMaxCombo((previousMax) =>
+        Math.max(previousMax, newCombo)
+      );
+
+      return newCombo;
+    });
 
     moveTarget();
   }
 
   function handleBoardClick() {
-    if (!isPlaying) {
-      return;
-    }
+    if (!isPlaying) return;
 
     setMisses((previousMisses) => previousMisses + 1);
     setCombo(0);
@@ -66,20 +96,28 @@ function ReactionGame() {
     setScore(0);
     setMisses(0);
     setCombo(0);
+    setMaxCombo(0);
     setTimeLeft(30);
 
     setReactionTime(null);
     setReactionTimes([]);
 
     setIsPlaying(true);
+  }
+useEffect(() => {
+  if (score > highScore) {
+    setHighScore(score);
+    localStorage.setItem("reactionHighScore", score);
+  }
+}, [score, highScore]);
+  useEffect(() => {
+    if (!isPlaying) return;
 
     moveTarget();
-  }
+  }, [isPlaying]);
 
   useEffect(() => {
-    if (!isPlaying) {
-      return;
-    }
+    if (!isPlaying) return;
 
     const gameTimer = setInterval(() => {
       setTimeLeft((previousTime) => {
@@ -92,27 +130,21 @@ function ReactionGame() {
       });
     }, 1000);
 
-    return () => {
-      clearInterval(gameTimer);
-    };
+    return () => clearInterval(gameTimer);
   }, [isPlaying]);
 
   useEffect(() => {
-    if (!isPlaying) {
-      return;
-    }
+    if (!isPlaying) return;
 
     const targetTimer = setTimeout(() => {
       setMisses((previousMisses) => previousMisses + 1);
       setCombo(0);
 
       moveTarget();
-    }, 1200);
+    }, targetLifetime);
 
-    return () => {
-      clearTimeout(targetTimer);
-    };
-  }, [targetPosition, isPlaying]);
+    return () => clearTimeout(targetTimer);
+  }, [targetPosition, isPlaying, targetLifetime]);
 
   const bestReaction =
     reactionTimes.length > 0
@@ -121,8 +153,10 @@ function ReactionGame() {
 
   const averageReaction =
     reactionTimes.length > 0
-      ? reactionTimes.reduce((total, time) => total + time, 0) /
-        reactionTimes.length
+      ? reactionTimes.reduce(
+          (total, time) => total + time,
+          0
+        ) / reactionTimes.length
       : null;
 
   const totalAttempts = score + misses;
@@ -140,10 +174,10 @@ function ReactionGame() {
       </header>
 
       <section className="stats">
-        <div className="stat">
-          <span className="stat-label">Score</span>
-          <span className="stat-value">{score}</span>
-        </div>
+<div className="stat">
+  <span className="stat-label">High Score</span>
+  <span className="stat-value">{highScore}</span>
+</div>
 
         <div className="stat">
           <span className="stat-label">Time</span>
@@ -171,46 +205,72 @@ function ReactionGame() {
             style={{
               left: `${targetPosition.x}px`,
               top: `${targetPosition.y}px`,
+              width: `${targetSize}px`,
+              height: `${targetSize}px`,
             }}
             onClick={handleTargetClick}
           >
             🎯
           </button>
+        ) : timeLeft === 0 ? (
+          <div className="game-over">
+            <p>High Score: {highScore}</p>
+            <h2>Game Over</h2>
+
+            <p>Score: {score}</p>
+            <p>Misses: {misses}</p>
+            <p>Accuracy: {accuracy.toFixed(1)}%</p>
+            <p>Best Combo: x{maxCombo}</p>
+
+            <p>
+              Best Reaction:{" "}
+              {bestReaction
+                ? `${Math.round(bestReaction)} ms`
+                : "--"}
+            </p>
+
+            <p>
+              Average Reaction:{" "}
+              {averageReaction
+                ? `${Math.round(averageReaction)} ms`
+                : "--"}
+            </p>
+          </div>
         ) : (
           <p className="game-message">
-            {timeLeft === 0
-              ? "Game Over!"
-              : "Press Start to begin"}
+            Press Start to begin
           </p>
         )}
       </section>
 
-      <section className="reaction-stats">
-        <span>
-          Reaction:{" "}
-          {reactionTime
-            ? `${Math.round(reactionTime)} ms`
-            : "--"}
-        </span>
+      {isPlaying && (
+        <section className="reaction-stats">
+          <span>
+            Reaction:{" "}
+            {reactionTime
+              ? `${Math.round(reactionTime)} ms`
+              : "--"}
+          </span>
 
-        <span>
-          Best:{" "}
-          {bestReaction
-            ? `${Math.round(bestReaction)} ms`
-            : "--"}
-        </span>
+          <span>
+            Best:{" "}
+            {bestReaction
+              ? `${Math.round(bestReaction)} ms`
+              : "--"}
+          </span>
 
-        <span>
-          Average:{" "}
-          {averageReaction
-            ? `${Math.round(averageReaction)} ms`
-            : "--"}
-        </span>
+          <span>
+            Average:{" "}
+            {averageReaction
+              ? `${Math.round(averageReaction)} ms`
+              : "--"}
+          </span>
 
-        <span>
-          Accuracy: {accuracy.toFixed(1)}%
-        </span>
-      </section>
+          <span>
+            Accuracy: {accuracy.toFixed(1)}%
+          </span>
+        </section>
+      )}
 
       {!isPlaying && (
         <button

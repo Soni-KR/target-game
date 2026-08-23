@@ -68,7 +68,10 @@
 }
 .target {
   position: absolute;
-
+transition:
+  width 0.15s ease,
+  height 0.15s ease,
+  transform 0.1s ease;
   width: 70px;
   height: 70px;
 
@@ -79,6 +82,13 @@
 
   cursor: pointer;
 }
+.target:hover {
+  transform: scale(1.08);
+}
+
+.target:active {
+  transform: scale(0.9);
+}
 .reaction-stats {
   display: flex;
   justify-content: space-between;
@@ -86,4 +96,20 @@
   margin-top: 20px;
 
   font-size: 0.95rem;
+}
+.game-over {
+  text-align: center;
+  <p>High Score: {highScore}</p>
+}
+
+.game-over h2 {
+  font-size: 2rem;
+  margin-bottom: 15px;
+}
+
+.game-over p {
+  margin: 6px 0;
+}
+.game-board {
+  cursor: crosshair;
 }
